@@ -1,6 +1,8 @@
 let video;
 let bodyPose;
 let poses = [];
+let bodyPartImages = {};
+
 
 let videoToggle;
 let showVideo = true;
@@ -25,6 +27,19 @@ const KEYPOINT_NAMES = [
   "right_ankle"
 ];
 
+const BODY_PARTS = [
+  { name: "head", image: "head", points: ["nose", "left_shoulder", "right_shoulder"] },
+  { name: "chest", image: "chest", points: ["left_shoulder", "right_shoulder", "left_hip", "right_hip"] },
+  { name: "left-shoulder", image: "left-shoulder", points: ["left_shoulder", "left_elbow"] },
+  { name: "right-shoulder", image: "right-shoulder", points: ["right_shoulder", "right_elbow"] },
+  { name: "left-arm", image: "left-arm", points: ["left_elbow", "left_wrist"] },
+  { name: "right-arm", image: "right-arm", points: ["right_elbow", "right_wrist"] },
+  { name: "left-thigh", image: "left-thigh", points: ["left_hip", "left_knee"] },
+  { name: "right-thigh", image: "right-thigh", points: ["right_hip", "right_knee"] },
+  { name: "left-leg", image: "left-leg", points: ["left_knee", "left_ankle"] },
+  { name: "right-leg", image: "right-leg", points: ["right_knee", "right_ankle"] }
+];
+
 // tuning
 const SMOOTHING = 0.25;
 const MATCH_DISTANCE = 180;   // max px to match same person
@@ -34,6 +49,19 @@ const MIN_CONFIDENCE = 0.2;
 
 function preload() {
   bodyPose = ml5.bodyPose("MoveNet", { flipped: true });
+
+  const parts = [
+    "head", "chest",
+    "left-shoulder", "right-shoulder",
+    "left-arm", "right-arm",
+    "left-thigh", "right-thigh",
+    "left-leg", "right-leg"
+  ];
+  for (let part of parts) {
+    bodyPartImages[part] = loadImage(`lebron/${part}.png`);
+  }
+  bodyPose = ml5.bodyPose("MoveNet", { flipped: true });
+
 }
 
 function mousePressed() {
@@ -280,54 +308,57 @@ function drawScrapbookBody(person, id) {
     rightShoulder.x, rightShoulder.y
   );
 
-  let headSize = shoulderWidth * 0.75;
-  let handSize = shoulderWidth * 0.22;
-  let footSize = shoulderWidth * 0.28;
-  let limbThickness = shoulderWidth * 0.22;
-  let torsoWidth = shoulderWidth * 0.9;
+  // let headSize = shoulderWidth * 0.75;
+  // let handSize = shoulderWidth * 0.22;
+  // let footSize = shoulderWidth * 0.28;
+  // let limbThickness = shoulderWidth * 0.22;
+  // let torsoWidth = shoulderWidth * 0.9;
 
   colorMode(HSL);
 
-  // torso
-  fill(person.accent, 70, 65, 0.7);
-  drawLimbRect(shoulderCenter, hipCenter, torsoWidth);
+  // fill((person.accent + 60) % 360, 70, 65, 0.75);
+  // drawLimbRect(leftShoulder, leftElbow, limbThickness);
+  // drawLimbRect(leftElbow, leftWrist, limbThickness * 0.9);
 
-  // head
-  fill((person.accent + 30) % 360, 70, 75, 0.85);
-  stroke(255);
-  strokeWeight(2);
-  circle(nose.x, nose.y, headSize);
+  // fill((person.accent + 120) % 360, 70, 65, 0.75);
+  // drawLimbRect(rightShoulder, rightElbow, limbThickness);
+  // drawLimbRect(rightElbow, rightWrist, limbThickness * 0.9);
 
-  // left arm
-  fill((person.accent + 60) % 360, 70, 65, 0.75);
-  drawLimbRect(leftShoulder, leftElbow, limbThickness);
-  drawLimbRect(leftElbow, leftWrist, limbThickness * 0.9);
+  // fill((person.accent + 180) % 360, 70, 65, 0.75);
+  // drawLimbRect(leftHip, leftKnee, limbThickness * 1.1);
+  // drawLimbRect(leftKnee, leftAnkle, limbThickness);
 
-  // right arm
-  fill((person.accent + 120) % 360, 70, 65, 0.75);
-  drawLimbRect(rightShoulder, rightElbow, limbThickness);
-  drawLimbRect(rightElbow, rightWrist, limbThickness * 0.9);
 
-  // left leg
-  fill((person.accent + 180) % 360, 70, 65, 0.75);
-  drawLimbRect(leftHip, leftKnee, limbThickness * 1.1);
-  drawLimbRect(leftKnee, leftAnkle, limbThickness);
+  // fill((person.accent + 240) % 360, 70, 65, 0.75);
+  // drawLimbRect(rightHip, rightKnee, limbThickness * 1.1);
+  // drawLimbRect(rightKnee, rightAnkle, limbThickness);
 
-  // right leg
-  fill((person.accent + 240) % 360, 70, 65, 0.75);
-  drawLimbRect(rightHip, rightKnee, limbThickness * 1.1);
-  drawLimbRect(rightKnee, rightAnkle, limbThickness);
+  // fill(person.accent, 70, 65, 0.7);
+  // drawLimbRect(shoulderCenter, hipCenter, torsoWidth);
 
-  // hands
-  fill((person.accent + 300) % 360, 80, 70, 0.9);
-  noStroke();
-  circle(leftWrist.x, leftWrist.y, handSize);
-  circle(rightWrist.x, rightWrist.y, handSize);
 
-  // feet
-  fill(person.accent, 90, 80, 0.9);
-  circle(leftAnkle.x, leftAnkle.y, footSize);
-  circle(rightAnkle.x, rightAnkle.y, footSize);
+  // fill((person.accent + 30) % 360, 70, 75, 0.85);
+  // stroke(255);
+  // strokeWeight(2);
+  // circle(nose.x, nose.y, headSize);
+
+
+  drawBodyImage(bodyPartImages["head"], nose, shoulderCenter, 1.2, 0.25);
+
+  drawBodyImage(bodyPartImages["left-arm"], leftElbow, leftWrist, .8);
+  drawBodyImage(bodyPartImages["left-shoulder"], leftShoulder, leftElbow, .5);
+
+  drawBodyImage(bodyPartImages["right-arm"], rightElbow, rightWrist, .8);
+  drawBodyImage(bodyPartImages["right-shoulder"], rightShoulder, rightElbow, .5);
+
+  drawBodyImage(bodyPartImages["left-leg"], leftKnee, leftAnkle, .4);
+  drawBodyImage(bodyPartImages["left-thigh"], leftHip, leftKnee, .4);
+
+  drawBodyImage(bodyPartImages["right-leg"], rightKnee, rightAnkle, .8);
+  drawBodyImage(bodyPartImages["right-thigh"], rightHip, rightKnee, .4);
+
+  drawBodyImage( bodyPartImages["chest"], shoulderCenter, hipCenter, .8 );
+
 
   // optional joint dots
   drawJointDots(person);
@@ -377,4 +408,30 @@ function drawTrackerLabels() {
     let tracked = trackedPeople[id];
     text(`ID ${id}`, tracked.center.x + 10, tracked.center.y - 10);
   }
+}
+
+function drawBodyImage(img, a, b, scale = 1) {
+  if (!img || !a || !b) return;
+
+  let mid = midpoint(a, b);
+  let len = dist(a.x, a.y, b.x, b.y);
+  let angle = atan2(b.y - a.y, b.x - a.x);
+
+  // preserve original image proportions
+  let aspect = img.height / img.width;
+
+  let drawWidth = len * scale;
+  let drawHeight = drawWidth * aspect;
+
+  push();
+  translate(mid.x, mid.y);
+  rotate(angle - PI / 2);
+
+  // translate(0, -drawHeight * offsetY);
+
+  imageMode(CENTER);
+
+  image(img, 0, 0, drawWidth, drawHeight);
+
+  pop();
 }
