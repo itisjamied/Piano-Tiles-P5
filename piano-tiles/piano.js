@@ -5,8 +5,8 @@ let poses = [];
 let laneActive = [false, false, false];
 let fallingTiles = [];
 
-let spawnInterval = 45;
-let tileSpeed = 16;
+let spawnInterval = 100;
+let tileSpeed = 5;
 
 let score = 0;
 let misses = 0;

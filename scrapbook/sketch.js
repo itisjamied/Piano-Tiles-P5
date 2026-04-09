@@ -343,7 +343,6 @@ function drawScrapbookBody(person, id) {
   // circle(nose.x, nose.y, headSize);
 
 
-  drawBodyImage(bodyPartImages["head"], nose, shoulderCenter, 1.2, 0.25);
 
   drawBodyImage(bodyPartImages["left-arm"], leftElbow, leftWrist, .8);
   drawBodyImage(bodyPartImages["left-shoulder"], leftShoulder, leftElbow, .5);
@@ -358,6 +357,9 @@ function drawScrapbookBody(person, id) {
   drawBodyImage(bodyPartImages["right-thigh"], rightHip, rightKnee, .4);
 
   drawBodyImage( bodyPartImages["chest"], shoulderCenter, hipCenter, .8 );
+
+  drawBodyImage(bodyPartImages["head"], nose, shoulderCenter, 1.2, 0.25);
+
 
 
   // optional joint dots
@@ -377,7 +379,7 @@ function drawLimbRect(a, b, thickness) {
   rectMode(CENTER);
   stroke(255);
   strokeWeight(2);
-  rect(0, 0, len, thickness, thickness * 0.35);
+  rect(0, 0, len, thickness, thickness * 0.55);
   pop();
 }
 
