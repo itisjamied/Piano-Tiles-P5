@@ -79,12 +79,12 @@ function preload() {
   // left-shoulder, left-arm, left-thigh, left-leg.
 
   // Load unique images
-  bodyPartImages["head"] = loadImage(`temp/head.png`);
-  bodyPartImages["chest"] = loadImage(`temp/chest.png`);
-  bodyPartImages["left-shoulder"] = loadImage(`temp/left-shoulder.png`);
-  bodyPartImages["left-arm"] = loadImage(`temp/left-arm.png`);
-  bodyPartImages["left-thigh"] = loadImage(`temp/left-thigh.png`);
-  bodyPartImages["left-leg"] = loadImage(`temp/left-leg.png`);
+  bodyPartImages["head"] = loadImage(`lebron/head.png`);
+  bodyPartImages["chest"] = loadImage(`lebron/chest.png`);
+  bodyPartImages["left-shoulder"] = loadImage(`lebron/left-shoulder.png`);
+  bodyPartImages["left-arm"] = loadImage(`lebron/left-arm.png`);
+  bodyPartImages["left-thigh"] = loadImage(`lebron/left-thigh.png`);
+  bodyPartImages["left-leg"] = loadImage(`lebron/left-leg.png`);
 
   // Alias right-side limbs to their left counterparts (will be flipped at render)
   bodyPartImages["right-shoulder"] = bodyPartImages["left-shoulder"];
