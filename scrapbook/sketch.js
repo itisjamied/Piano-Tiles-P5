@@ -404,10 +404,10 @@ function drawScrapbookBody(person, id) {
   // Render body parts (either images or shapes based on mode)
   if (useShapeMode) {
     // In shape mode, use normalized scale factors to show true skeletal proportions
-    drawBodyShape(bodyPartImages["left-arm"], leftElbow, leftWrist, "left-arm", id, 0.8);
+    drawBodyShape(bodyPartImages["left-arm"], leftElbow, leftWrist, "left-arm", id, 0.1);
     drawBodyShape(bodyPartImages["left-shoulder"], leftShoulder, leftElbow, "left-shoulder", id, 0.8);
 
-    drawBodyShape(bodyPartImages["right-arm"], rightElbow, rightWrist, "right-arm", id, 0.8);
+    drawBodyShape(bodyPartImages["right-arm"], rightElbow, rightWrist, "right-arm", id, 0.2);
     drawBodyShape(bodyPartImages["right-shoulder"], rightShoulder, rightElbow, "right-shoulder", id, 0.8);
 
     drawBodyShape(bodyPartImages["left-leg"], leftKnee, leftAnkle, "left-leg", id, 0.8);
@@ -421,23 +421,27 @@ function drawScrapbookBody(person, id) {
     drawBodyShape(bodyPartImages["head"], nose, shoulderCenter, "head", id, 1.2, 0.25);
   } else {
     // In image mode, use artistic scale factors for collage effect
-    drawBodyImage(bodyPartImages["left-arm"], leftElbow, leftWrist, .8, 0, false);
-    drawBodyImage(bodyPartImages["left-shoulder"], leftShoulder, leftElbow, .5, 0, false);
+  
 
-    drawBodyImage(bodyPartImages["right-arm"], rightElbow, rightWrist, .8, 0, true);
-    drawBodyImage(bodyPartImages["right-shoulder"], rightShoulder, rightElbow, .5, 0, true);
+   
 
-    drawBodyImage(bodyPartImages["left-leg"], leftKnee, leftAnkle, .4, 0, false);
-    drawBodyImage(bodyPartImages["left-thigh"], leftHip, leftKnee, .4, 0, false);
+    drawBodyImage(bodyPartImages["left-leg"], leftKnee, leftAnkle, .5, 0, false);
+    drawBodyImage(bodyPartImages["left-thigh"], leftHip, leftKnee, .6, 0, false);
 
-    drawBodyImage(bodyPartImages["right-leg"], rightKnee, rightAnkle, .4, 0, true);
-    drawBodyImage(bodyPartImages["right-thigh"], rightHip, rightKnee, .4, 0, true);
+    drawBodyImage(bodyPartImages["right-leg"], rightKnee, rightAnkle, .5, 0, true);
+    drawBodyImage(bodyPartImages["right-thigh"], rightHip, rightKnee, .6, 0, true);
 
     drawBodyImage(bodyPartImages["chest"], shoulderCenter, hipCenter, .8, 0, false);
 
+    drawBodyImage(bodyPartImages["left-arm"], leftElbow, leftWrist, .55, 0, false);
+    drawBodyImage(bodyPartImages["left-shoulder"], leftShoulder, leftElbow, .5, 0, false);
+
+    drawBodyImage(bodyPartImages["right-arm"], rightElbow, rightWrist, .55, 0, true);
+    drawBodyImage(bodyPartImages["right-shoulder"], rightShoulder, rightElbow, .5, 0, true);
+
     // Adjust head position up by 10px
-    let adjustedNose = createVector(nose.x, nose.y - 10);
-    drawBodyImage(bodyPartImages["head"], adjustedNose, shoulderCenter, 1.2, 0, false);
+    let adjustedNose = createVector(nose.x, nose.y - 40);
+    drawBodyImage(bodyPartImages["head"], adjustedNose, shoulderCenter, 1.2, 0.2, false);
   }
 
 
@@ -514,7 +518,7 @@ function drawBodyImage(img, a, b, scaleFactor = 1, offsetY = 0, flipped = false)
     scale(-1, 1);
   }
 
-  // translate(0, -drawHeight * offsetY);
+  translate(0, -drawHeight * offsetY);
 
   imageMode(CENTER);
 
@@ -540,6 +544,7 @@ function drawBodyShape(img, a, b, partName, personId, scale = 1, offsetY = 0) {
     drawWidth = len * 1.2;  // width of head
     drawHeight = len * 1.4; // height of head (slightly taller)
     aspect = drawHeight / drawWidth;
+    // translate( 0, -600, 0);
   } else if (partName === "chest") {
     // Chest: width = shoulder width, height = torso length
     drawWidth = len * 0.7;  // torso width
