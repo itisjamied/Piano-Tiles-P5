@@ -74,18 +74,23 @@ const MIN_CONFIDENCE = 0.2;
 function preload() {
   bodyPose = ml5.bodyPose("MoveNet", { flipped: true });
 
-  const parts = [
-    "head", "chest",
-    "left-shoulder", "right-shoulder",
-    "left-arm", "right-arm",
-    "left-thigh", "right-thigh",
-    "left-leg", "right-leg"
-  ];
-  for (let part of parts) {
-    bodyPartImages[part] = loadImage(`lebron/${part}.png`);
-  }
-  bodyPose = ml5.bodyPose("MoveNet", { flipped: true });
+  // Right limb images are mirrored from left at render time.
+  // Only 6 image files are required: head, chest,
+  // left-shoulder, left-arm, left-thigh, left-leg.
 
+  // Load unique images
+  bodyPartImages["head"] = loadImage(`temp/head.png`);
+  bodyPartImages["chest"] = loadImage(`temp/chest.png`);
+  bodyPartImages["left-shoulder"] = loadImage(`temp/left-shoulder.png`);
+  bodyPartImages["left-arm"] = loadImage(`temp/left-arm.png`);
+  bodyPartImages["left-thigh"] = loadImage(`temp/left-thigh.png`);
+  bodyPartImages["left-leg"] = loadImage(`temp/left-leg.png`);
+
+  // Alias right-side limbs to their left counterparts (will be flipped at render)
+  bodyPartImages["right-shoulder"] = bodyPartImages["left-shoulder"];
+  bodyPartImages["right-arm"] = bodyPartImages["left-arm"];
+  bodyPartImages["right-thigh"] = bodyPartImages["left-thigh"];
+  bodyPartImages["right-leg"] = bodyPartImages["left-leg"];
 }
 
 function mousePressed() {
@@ -416,21 +421,23 @@ function drawScrapbookBody(person, id) {
     drawBodyShape(bodyPartImages["head"], nose, shoulderCenter, "head", id, 1.2, 0.25);
   } else {
     // In image mode, use artistic scale factors for collage effect
-    drawBodyImage(bodyPartImages["left-arm"], leftElbow, leftWrist, .8);
-    drawBodyImage(bodyPartImages["left-shoulder"], leftShoulder, leftElbow, .5);
+    drawBodyImage(bodyPartImages["left-arm"], leftElbow, leftWrist, .8, 0, false);
+    drawBodyImage(bodyPartImages["left-shoulder"], leftShoulder, leftElbow, .5, 0, false);
 
-    drawBodyImage(bodyPartImages["right-arm"], rightElbow, rightWrist, .8);
-    drawBodyImage(bodyPartImages["right-shoulder"], rightShoulder, rightElbow, .5);
+    drawBodyImage(bodyPartImages["right-arm"], rightElbow, rightWrist, .8, 0, true);
+    drawBodyImage(bodyPartImages["right-shoulder"], rightShoulder, rightElbow, .5, 0, true);
 
-    drawBodyImage(bodyPartImages["left-leg"], leftKnee, leftAnkle, .4);
-    drawBodyImage(bodyPartImages["left-thigh"], leftHip, leftKnee, .4);
+    drawBodyImage(bodyPartImages["left-leg"], leftKnee, leftAnkle, .4, 0, false);
+    drawBodyImage(bodyPartImages["left-thigh"], leftHip, leftKnee, .4, 0, false);
 
-    drawBodyImage(bodyPartImages["right-leg"], rightKnee, rightAnkle, .8);
-    drawBodyImage(bodyPartImages["right-thigh"], rightHip, rightKnee, .4);
+    drawBodyImage(bodyPartImages["right-leg"], rightKnee, rightAnkle, .4, 0, true);
+    drawBodyImage(bodyPartImages["right-thigh"], rightHip, rightKnee, .4, 0, true);
 
-    drawBodyImage(bodyPartImages["chest"], shoulderCenter, hipCenter, .8);
+    drawBodyImage(bodyPartImages["chest"], shoulderCenter, hipCenter, .8, 0, false);
 
-    drawBodyImage(bodyPartImages["head"], nose, shoulderCenter, 1.2, 0.25);
+    // Adjust head position up by 10px
+    let adjustedNose = createVector(nose.x, nose.y - 10);
+    drawBodyImage(bodyPartImages["head"], adjustedNose, shoulderCenter, 1.2, 0, false);
   }
 
 
@@ -485,7 +492,7 @@ function drawTrackerLabels() {
   }
 }
 
-function drawBodyImage(img, a, b, scale = 1, offsetY = 0) {
+function drawBodyImage(img, a, b, scaleFactor = 1, offsetY = 0, flipped = false) {
   if (!img || !a || !b) return;
 
   let mid = midpoint(a, b);
@@ -495,12 +502,17 @@ function drawBodyImage(img, a, b, scale = 1, offsetY = 0) {
   // preserve original image proportions
   let aspect = img.height / img.width;
 
-  let drawWidth = len * scale;
+  let drawWidth = len * scaleFactor;
   let drawHeight = drawWidth * aspect;
 
   push();
   translate(mid.x, mid.y);
   rotate(angle - PI / 2);
+
+  // Apply horizontal flip for right-side limbs (after rotation)
+  if (flipped) {
+    scale(-1, 1);
+  }
 
   // translate(0, -drawHeight * offsetY);
 
