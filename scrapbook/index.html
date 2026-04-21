@@ -22,6 +22,28 @@
         transform: scale(1.5);
         margin-right: 8px;
       }
+
+      button {
+        background: #444;
+        color: white;
+        border: 1px solid #666;
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        border-radius: 4px;
+        margin-left: 10px;
+      }
+
+      button:hover {
+        background: #555;
+      }
+
+      .controls {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        z-index: 100;
+      }
     </style>
 
     <!-- p5 -->
@@ -31,6 +53,9 @@
     <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>
   </head>
   <body>
+    <div class="controls">
+      <div id="checkboxContainer"></div>
+    </div>
     <script src="sketch.js"></script>
   </body>
 </html>
