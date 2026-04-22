@@ -510,8 +510,9 @@ function drawScrapbookBody(person, id) {
     drawBodyImage(images["left-arm"],  lElbowIn, lWristIn, .55 * 0.85 * 0.9 * 1.05, 0, false);
     drawBodyImage(images["right-arm"], rElbowIn, rWristIn, .55 * 0.85 * 0.9 * 1.05, 0, false);
 
-    // Head: shifted up 140px
-    let adjustedNose = createVector(nose.x, nose.y - 140);
+    // Head: offset proportional to head size so it scales with the body
+    let headLen = dist(nose.x, nose.y, shoulderCenter.x, shoulderCenter.y);
+    let adjustedNose = createVector(nose.x, nose.y - headLen * 0.8);
     drawBodyImage(images["head"], adjustedNose, shoulderCenter, 0.675, 0, false);
 
     noTint();
