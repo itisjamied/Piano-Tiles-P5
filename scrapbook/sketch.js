@@ -12,6 +12,11 @@ let shapeModeToggle;
 let useShapeMode = false;
 let exportButton;
 
+// backdrop toggle
+let backdropIframe;
+let backdropToggle;
+let showBackdrop = false;
+
 // image overlay toggle
 let imageOverlayToggle;
 let showImageOverlay = true;
@@ -56,18 +61,18 @@ const BODY_PARTS = [
   { name: "right-leg", image: "right-leg", points: ["right_knee", "right_ankle"] }
 ];
 
-// Color mapping for shape mode
+// Color mapping for shape mode — vibrant cool palette
 const BODY_PART_COLORS = {
-  "head": [255, 50, 50],          // red
-  "chest": [50, 100, 255],        // blue
-  "left-shoulder": [50, 200, 50], // green
-  "right-shoulder": [50, 200, 50], // green
-  "left-arm": [255, 200, 50],     // yellow
-  "right-arm": [255, 200, 50],    // yellow
-  "left-thigh": [200, 50, 200],   // purple
-  "right-thigh": [200, 50, 200],  // purple
-  "left-leg": [255, 120, 50],     // orange
-  "right-leg": [255, 120, 50]     // orange
+  "head": [0, 230, 255],           // vivid cyan
+  "chest": [40, 80, 255],          // vivid blue
+  "left-shoulder": [100, 50, 255], // blue-violet
+  "right-shoulder": [100, 50, 255],// blue-violet
+  "left-arm": [0, 200, 230],       // teal-cyan
+  "right-arm": [0, 200, 230],      // teal-cyan
+  "left-thigh": [160, 40, 255],    // vivid violet
+  "right-thigh": [160, 40, 255],   // vivid violet
+  "left-leg": [0, 170, 210],       // deep teal
+  "right-leg": [0, 170, 210]       // deep teal
 };
 
 // tuning
@@ -173,6 +178,26 @@ function setup() {
     }
   });
 
+  // Backdrop iframe (YouTube, looping, muted for autoplay)
+  backdropIframe = createElement('iframe');
+  backdropIframe.id('backdropFrame');
+  backdropIframe.attribute('src', 'https://www.youtube.com/embed/xaeIuEY-jNo?autoplay=1&loop=1&mute=1&playlist=xaeIuEY-jNo&controls=0');
+  backdropIframe.attribute('allow', 'autoplay; encrypted-media; accelerometer; gyroscope; picture-in-picture');
+  backdropIframe.attribute('frameborder', '0');
+
+  // Backdrop toggle
+  backdropToggle = createCheckbox(" Show backdrop", false);
+  backdropToggle.parent("checkboxContainer");
+  backdropToggle.style("color", "white");
+  backdropToggle.style("font-size", "18px");
+  backdropToggle.style("display", "block");
+  backdropToggle.style("margin-bottom", "10px");
+  backdropToggle.changed(() => {
+    showBackdrop = backdropToggle.checked();
+    let frame = document.getElementById('backdropFrame');
+    if (frame) frame.style.display = showBackdrop ? 'block' : 'none';
+  });
+
   // Image overlay toggle
   imageOverlayToggle = createCheckbox(" Show image overlay", true);
   imageOverlayToggle.parent("checkboxContainer");
@@ -192,7 +217,12 @@ function setup() {
 }
 
 function draw() {
-  background(0);
+  // When backdrop iframe is active, make canvas transparent so the video shows through
+  if (showBackdrop) {
+    clear();
+  } else {
+    background(0);
+  }
 
   if (showVideo) {
     image(video, 0, 0, width, height);
@@ -715,10 +745,11 @@ function drawBodyAtSnapshot(person, pts, alpha, tintHue, ptsHistory = []) {
   colorMode(HSL);
   ellipseMode(CENTER);
 
-  let shimmer = (frameCount * 1.2) % 360;
+  // Shimmer cycles through the cool hue range
+  let shimmer = (frameCount * 0.6) % 360;
   let base    = (tintHue + shimmer) % 360;
-  const DOT = 2;
-  const GAP = 6;
+  const DOT = 3;
+  const GAP = 20;
 
   // Subsample history to ~8 evenly-spaced frames for fluid trails
   function hist(name) {
@@ -786,15 +817,19 @@ function dotFillSegment(a, b, ratioA, ratioB, dotSize, spacing, hue, alpha, aHis
     histGeo.push({ aH, bH, lH, nxH: -sin(angH), nyH: cos(angH) });
   }
 
-  let jitter = spacing * 0.25;
-  let steps  = max(1, floor(len / spacing));
-  let dots   = [];
+  let jitter  = spacing * 0.25;
+  let steps   = max(1, floor(len / spacing));
+  // Extend loop into cap regions so hemispherical ends are actually filled
+  let capExtA = ceil((len * ratioA / 2) / spacing);
+  let capExtB = ceil((len * ratioB / 2) / spacing);
+  let dots    = [];
 
-  for (let s = 0; s <= steps; s++) {
+  for (let s = -capExtA; s <= steps + capExtB; s++) {
     let t     = s / steps;
     let cx    = lerp(a.x, b.x, t);
     let cy    = lerp(a.y, b.y, t);
-    let halfW = lerp(len * ratioA, len * ratioB, t) / 2;
+    // Use the appropriate cap radius when outside the bone endpoints
+    let halfW = t < 0 ? (len * ratioA / 2) : t > 1 ? (len * ratioB / 2) : lerp(len * ratioA, len * ratioB, t) / 2;
     let wN    = max(1, floor((halfW * 2) / spacing));
 
     for (let w = -wN; w <= wN; w++) {
@@ -817,26 +852,60 @@ function dotFillSegment(a, b, ratioA, ratioB, dotSize, spacing, hue, alpha, aHis
       trail.push({ x: dx, y: dy }); // current position at tip
 
       let sz = dotSize * (0.65 + noise(s * 0.6 + 33, w * 0.6 + 33) * 0.7);
-      dots.push({ dx, dy, trail, sz });
+      // Two-octave noise for per-dot metallic gradient
+      let nc = noise(dx * 0.012, dy * 0.012, frameCount * 0.006) * 0.7 +
+               noise(dx * 0.04 + 50, dy * 0.04 + 50, frameCount * 0.01 + 99) * 0.3;
+      // Fade dots near the boundary so edges appear smooth and rounded
+      let edgeDist = capsuleEdgeDist(dx, dy, a, b, len, ratioA, ratioB, lx, ly, nx, ny);
+      let edgeFade = constrain(edgeDist / (spacing * 2.5), 0, 1);
+      dots.push({ dx, dy, trail, sz, nc, edgeFade });
     }
   }
 
-  // Pass 1: fluid trails — connected segments with taper
+  // Map hue to vibrant cool palette (cyan → blue → violet, 170–290°)
+  let mh      = ((hue % 360) + 360) % 360;
+  let coolHue = 170 + (mh / 360) * 120;
+
+  // Pass 1: fluid trails — lightness sweeps dark→bright per dot
   if (histGeo.length > 0) {
     for (let d of dots) {
+      let dotLit = map(d.nc, 0, 1, 18, 82);
       for (let i = 0; i < d.trail.length - 1; i++) {
         let progress = i / (d.trail.length - 1);
-        stroke(hue, 85, 68, lerp(0, alpha * 0.55, pow(progress, 1.2)));
+        let sLit = lerp(12, dotLit + 10, progress);
+        let sSat = lerp(72, 100, d.nc);
+        stroke(coolHue, sSat, sLit, lerp(0, alpha * 0.55, pow(progress, 1.2)) * d.edgeFade);
         strokeWeight(lerp(0.4, dotSize * 1.3, progress));
         line(d.trail[i].x, d.trail[i].y, d.trail[i + 1].x, d.trail[i + 1].y);
       }
     }
   }
 
-  // Pass 2: dots at current position
+  // Pass 2: dots — vibrant cool colors with per-dot lightness and edge fade
   noStroke();
-  fill(hue, 85, 60, alpha);
-  for (let d of dots) ellipse(d.dx, d.dy, d.sz, d.sz);
+  for (let d of dots) {
+    let dotLit  = map(d.nc, 0, 1, 18, 82);
+    let dotSat  = lerp(72, 100, d.nc);
+    let hShift  = map(d.nc, 0, 1, -8, 8);
+    let fadedSz = d.sz * (0.15 + 0.85 * d.edgeFade);
+    fill(constrain(coolHue + hShift, 160, 300), dotSat, dotLit, alpha * pow(d.edgeFade, 0.5));
+    ellipse(d.dx, d.dy, fadedSz, fadedSz);
+  }
+}
+
+// Returns pixel distance from (x,y) to the boundary of the tapered capsule (positive = inside)
+function capsuleEdgeDist(x, y, a, b, len, ratioA, ratioB, lx, ly, nx, ny) {
+  let ax = x - a.x, ay = y - a.y;
+  let along = ax * lx + ay * ly;
+  if (along <= 0) {
+    return (len * ratioA / 2) - sqrt(ax * ax + ay * ay);
+  }
+  if (along >= len) {
+    let bx = x - b.x, by = y - b.y;
+    return (len * ratioB / 2) - sqrt(bx * bx + by * by);
+  }
+  let perp = abs(ax * nx + ay * ny);
+  return lerp(len * ratioA, len * ratioB, along / len) / 2 - perp;
 }
 
 // Returns true if point (x,y) is inside the tapered capsule between a and b
@@ -858,8 +927,8 @@ function inTaperedCapsule(x, y, a, b, len, ratioA, ratioB, lx, ly, nx, ny) {
 function dotFillTorso(ls, rs, lh, rh, dotSize, spacing, hue, alpha, lsH = [], rsH = [], lhH = [], rhH = []) {
   let sMid = midpoint(ls, rs);
   let hMid = midpoint(lh, rh);
-  let sHW  = dist(ls.x, ls.y, rs.x, rs.y) * 0.46;
-  let hHW  = dist(lh.x, lh.y, rh.x, rh.y) * 0.46;
+  let sHW  = dist(ls.x, ls.y, rs.x, rs.y) * 0.368; // 0.46 * 0.8 — 20% narrower
+  let hHW  = dist(lh.x, lh.y, rh.x, rh.y) * 0.368;
   let len  = dist(sMid.x, sMid.y, hMid.x, hMid.y);
   if (len < 1) return;
 
@@ -874,21 +943,24 @@ function dotFillTorso(ls, rs, lh, rh, dotSize, spacing, hue, alpha, lsH = [], rs
     if (!lsH[i] || !rsH[i] || !lhH[i] || !rhH[i]) continue;
     let smH  = midpoint(lsH[i], rsH[i]);
     let hmH  = midpoint(lhH[i], rhH[i]);
-    let sHWH = dist(lsH[i].x, lsH[i].y, rsH[i].x, rsH[i].y) * 0.46;
-    let hHWH = dist(lhH[i].x, lhH[i].y, rhH[i].x, rhH[i].y) * 0.46;
+    let sHWH = dist(lsH[i].x, lsH[i].y, rsH[i].x, rsH[i].y) * 0.368;
+    let hHWH = dist(lhH[i].x, lhH[i].y, rhH[i].x, rhH[i].y) * 0.368;
     let angH = atan2(hmH.y - smH.y, hmH.x - smH.x);
     histGeo.push({ smH, hmH, sHWH, hHWH, nxH: -sin(angH), nyH: cos(angH) });
   }
 
-  let jitter = spacing * 0.25;
-  let steps  = max(1, floor(len / spacing));
-  let dots   = [];
+  let jitter  = spacing * 0.25;
+  let steps   = max(1, floor(len / spacing));
+  // Extend into rounded cap regions at shoulder and hip
+  let capExtS = ceil(sHW / spacing);
+  let capExtH = ceil(hHW / spacing);
+  let dots    = [];
 
-  for (let s = 0; s <= steps; s++) {
+  for (let s = -capExtS; s <= steps + capExtH; s++) {
     let t     = s / steps;
     let cx    = lerp(sMid.x, hMid.x, t);
     let cy    = lerp(sMid.y, hMid.y, t);
-    let halfW = lerp(sHW, hHW, t);
+    let halfW = t < 0 ? sHW : t > 1 ? hHW : lerp(sHW, hHW, t);
     let wN    = max(1, floor((halfW * 2) / spacing));
 
     for (let w = -wN; w <= wN; w++) {
@@ -899,8 +971,20 @@ function dotFillTorso(ls, rs, lh, rh, dotSize, spacing, hue, alpha, lsH = [], rs
       let dy  = cy + ny * off + jy;
 
       let ax = dx - sMid.x, ay2 = dy - sMid.y;
-      if (ax * lx + ay2 * ly < 0 || ax * lx + ay2 * ly > len ||
-          abs(ax * nx + ay2 * ny) > lerp(sHW, hHW, (ax * lx + ay2 * ly) / len)) continue;
+      let along2 = ax * lx + ay2 * ly;
+      let perp2  = abs(ax * nx + ay2 * ny);
+      let inTorso;
+      if (along2 < 0) {
+        // Rounded cap at shoulder line
+        inTorso = (ax * ax + ay2 * ay2) <= sHW * sHW;
+      } else if (along2 > len) {
+        // Rounded cap at hip line
+        let bx2 = dx - hMid.x, by2 = dy - hMid.y;
+        inTorso = (bx2 * bx2 + by2 * by2) <= hHW * hHW;
+      } else {
+        inTorso = perp2 <= lerp(sHW, hHW, along2 / len);
+      }
+      if (!inTorso) continue;
 
       let trail = [];
       for (let g of histGeo) {
@@ -913,23 +997,51 @@ function dotFillTorso(ls, rs, lh, rh, dotSize, spacing, hue, alpha, lsH = [], rs
       trail.push({ x: dx, y: dy });
 
       let sz = dotSize * (0.65 + noise(s * 0.6 + 400, w * 0.6 + 400) * 0.7);
-      dots.push({ dx, dy, trail, sz });
+      let nc = noise(dx * 0.012, dy * 0.012, frameCount * 0.006) * 0.7 +
+               noise(dx * 0.04 + 150, dy * 0.04 + 150, frameCount * 0.01 + 99) * 0.3;
+      // Edge fade for smooth rounded boundary
+      let axEF = dx - sMid.x, ayEF = dy - sMid.y;
+      let alongEF = axEF * lx + ayEF * ly;
+      let edgeDistT;
+      if (alongEF <= 0) {
+        edgeDistT = sHW - sqrt(axEF * axEF + ayEF * ayEF);
+      } else if (alongEF >= len) {
+        let bxEF = dx - hMid.x, byEF = dy - hMid.y;
+        edgeDistT = hHW - sqrt(bxEF * bxEF + byEF * byEF);
+      } else {
+        edgeDistT = lerp(sHW, hHW, alongEF / len) - abs(axEF * nx + ayEF * ny);
+      }
+      let edgeFade = constrain(edgeDistT / (spacing * 2.5), 0, 1);
+      dots.push({ dx, dy, trail, sz, nc, edgeFade });
     }
   }
 
+  // Map hue to vibrant cool palette for torso
+  let mhT     = ((hue % 360) + 360) % 360;
+  let coolHueT = 170 + (mhT / 360) * 120;
+
   if (histGeo.length > 0) {
     for (let d of dots) {
+      let dotLitT = map(d.nc, 0, 1, 18, 82);
       for (let i = 0; i < d.trail.length - 1; i++) {
         let progress = i / (d.trail.length - 1);
-        stroke(hue, 85, 68, lerp(0, alpha * 0.55, pow(progress, 1.2)));
+        let sLitT = lerp(12, dotLitT + 10, progress);
+        let sSatT = lerp(72, 100, d.nc);
+        stroke(coolHueT, sSatT, sLitT, lerp(0, alpha * 0.55, pow(progress, 1.2)) * d.edgeFade);
         strokeWeight(lerp(0.4, dotSize * 1.3, progress));
         line(d.trail[i].x, d.trail[i].y, d.trail[i + 1].x, d.trail[i + 1].y);
       }
     }
   }
   noStroke();
-  fill(hue, 85, 60, alpha);
-  for (let d of dots) ellipse(d.dx, d.dy, d.sz, d.sz);
+  for (let d of dots) {
+    let dotLitT  = map(d.nc, 0, 1, 18, 82);
+    let dotSatT  = lerp(72, 100, d.nc);
+    let hShiftT  = map(d.nc, 0, 1, -8, 8);
+    let fadedSzT = d.sz * (0.15 + 0.85 * d.edgeFade);
+    fill(constrain(coolHueT + hShiftT, 160, 300), dotSatT, dotLitT, alpha * pow(d.edgeFade, 0.5));
+    ellipse(d.dx, d.dy, fadedSzT, fadedSzT);
+  }
 }
 
 function dotFillEllipse(cx, cy, rx, ry, dotSize, spacing, hue, alpha, cxHist = [], cyHist = []) {
@@ -953,23 +1065,42 @@ function dotFillEllipse(cx, cy, rx, ry, dotSize, spacing, hue, alpha, cxHist = [
       trail.push({ x: cx + sx, y: cy + sy });
 
       let sz = dotSize * (0.65 + noise(x * 0.08 + 700, y * 0.08 + 700) * 0.7);
-      dots.push({ dx: cx + sx, dy: cy + sy, trail, sz });
+      let dxE = cx + sx, dyE = cy + sy;
+      let nc = noise(dxE * 0.012, dyE * 0.012, frameCount * 0.006) * 0.7 +
+               noise(dxE * 0.04 + 250, dyE * 0.04 + 250, frameCount * 0.01 + 99) * 0.3;
+      // Ellipse edge fade: normalised radius 0=centre, 1=boundary
+      let normR = sqrt((sx * sx) / (rx * rx) + (sy * sy) / (ry * ry));
+      let edgeFade = constrain((1 - normR) * min(rx, ry) / (spacing * 2.5), 0, 1);
+      dots.push({ dx: dxE, dy: dyE, trail, sz, nc, edgeFade });
     }
   }
 
+  // Map hue to vibrant cool palette for head ellipse
+  let mhE      = ((hue % 360) + 360) % 360;
+  let coolHueE = 170 + (mhE / 360) * 120;
+
   if (hasHist) {
     for (let d of dots) {
+      let dotLitE = map(d.nc, 0, 1, 18, 82);
       for (let i = 0; i < d.trail.length - 1; i++) {
         let progress = i / (d.trail.length - 1);
-        stroke(hue, 85, 68, lerp(0, alpha * 0.55, pow(progress, 1.2)));
+        let sLitE = lerp(12, dotLitE + 10, progress);
+        let sSatE = lerp(72, 100, d.nc);
+        stroke(coolHueE, sSatE, sLitE, lerp(0, alpha * 0.55, pow(progress, 1.2)) * d.edgeFade);
         strokeWeight(lerp(0.4, dotSize * 1.3, progress));
         line(d.trail[i].x, d.trail[i].y, d.trail[i + 1].x, d.trail[i + 1].y);
       }
     }
   }
   noStroke();
-  fill(hue, 85, 60, alpha);
-  for (let d of dots) ellipse(d.dx, d.dy, d.sz, d.sz);
+  for (let d of dots) {
+    let dotLitE  = map(d.nc, 0, 1, 18, 82);
+    let dotSatE  = lerp(72, 100, d.nc);
+    let hShiftE  = map(d.nc, 0, 1, -8, 8);
+    let fadedSzE = d.sz * (0.15 + 0.85 * d.edgeFade);
+    fill(constrain(coolHueE + hShiftE, 160, 300), dotSatE, dotLitE, alpha * pow(d.edgeFade, 0.5));
+    ellipse(d.dx, d.dy, fadedSzE, fadedSzE);
+  }
 }
 
 // Tapered capsule: wide at joint a, narrow at joint b
@@ -998,8 +1129,8 @@ function drawTaperedLimb(a, b, ratioA, ratioB) {
 
 // Torso as a trapezoid following actual shoulder/hip keypoints
 function drawTorsoSilhouette(ls, rs, lh, rh) {
-  let sHW = dist(ls.x, ls.y, rs.x, rs.y) * 0.46;
-  let hHW = dist(lh.x, lh.y, rh.x, rh.y) * 0.46;
+  let sHW = dist(ls.x, ls.y, rs.x, rs.y) * 0.368;
+  let hHW = dist(lh.x, lh.y, rh.x, rh.y) * 0.368;
 
   let sMid  = midpoint(ls, rs);
   let hMid  = midpoint(lh, rh);
@@ -1014,6 +1145,10 @@ function drawTorsoSilhouette(ls, rs, lh, rh) {
   vertex(hMid.x - px * hHW, hMid.y - py * hHW);
   vertex(sMid.x - px * sHW, sMid.y - py * sHW);
   endShape(CLOSE);
+  // Rounded caps at shoulder and hip lines
+  ellipseMode(CENTER);
+  ellipse(sMid.x, sMid.y, sHW * 2, sHW * 2);
+  ellipse(hMid.x, hMid.y, hHW * 2, hHW * 2);
 }
 
 /* =========================

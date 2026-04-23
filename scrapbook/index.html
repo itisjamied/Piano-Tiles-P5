@@ -15,7 +15,22 @@
 
       canvas {
         display: block;
-        margin: 0 auto;
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1;
+      }
+
+      #backdropFrame {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 1480px;
+        height: 1100px;
+        border: none;
+        z-index: 0;
+        pointer-events: none;
+        display: none;
       }
       
       input[type="checkbox"] {
