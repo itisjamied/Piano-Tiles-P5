@@ -26,6 +26,7 @@ let trackedPeople = {};
 let nextPersonId = 0;
 
 let characterImageSets = [];
+let trailBuffer;
 
 const KEYPOINT_NAMES = [
   "nose",
@@ -77,9 +78,8 @@ const MAX_MISSING_FRAMES = 20;
 const MAX_TRACKED_PEOPLE = 5;
 const MIN_CONFIDENCE = 0.2;
 
-// color trail
-const TRAIL_LENGTH = 15;       // number of ghost frames kept
-const TRAIL_SAMPLE_RATE = 3;   // capture a snapshot every N draw frames
+// trail fade amount per frame (0–255); lower = longer trail
+const TRAIL_FADE = 18;
 
 function preload() {
 
@@ -144,6 +144,8 @@ function setup() {
   video.size(width, height);
   video.hide();
 
+  trailBuffer = createGraphics(width, height);
+
   bodyPose.detectStart(video, gotPoses);
 
   // Video toggle
@@ -166,8 +168,8 @@ function setup() {
   shapeModeToggle.style("margin-bottom", "10px");
   shapeModeToggle.changed(() => {
     useShapeMode = shapeModeToggle.checked();
+    trailBuffer.clear();
     if (!useShapeMode) {
-      // Clear dimension history when toggling off
       dimensionHistory = [];
       dimensionStats = {};
     }
@@ -201,7 +203,25 @@ function draw() {
   // update tracking from current detections
   updateTrackedPeople();
 
-  // draw all tracked scrapbook bodies
+  if (!useShapeMode) {
+    // Decay the trail buffer each frame
+    trailBuffer.push();
+    trailBuffer.colorMode(RGB);
+    trailBuffer.noStroke();
+    trailBuffer.fill(0, 0, 0, TRAIL_FADE);
+    trailBuffer.rect(0, 0, width, height);
+    trailBuffer.pop();
+
+    // Stamp current silhouettes into the trail buffer
+    for (let id in trackedPeople) {
+      drawPersonToTrailBuffer(trackedPeople[id]);
+    }
+
+    // Render the fading trail behind the main bodies
+    image(trailBuffer, 0, 0);
+  }
+
+  // draw all tracked scrapbook bodies on top
   for (let id in trackedPeople) {
     drawScrapbookBody(trackedPeople[id], id);
   }
@@ -306,8 +326,7 @@ function createTrackedPerson(pose, center) {
     center: createVector(center.x, center.y),
     lastSeen: frameCount,
     accent: random(360),
-    characterIndex,
-    poseHistory: []
+    characterIndex
   };
 }
 
@@ -328,17 +347,6 @@ function updateTrackedPerson(person, pose, newCenter) {
     }
   }
 
-  // Capture trail snapshot at regular intervals
-  if (frameCount % TRAIL_SAMPLE_RATE === 0) {
-    let snapshot = {};
-    for (let name in person.smoothPoints) {
-      snapshot[name] = person.smoothPoints[name].copy();
-    }
-    person.poseHistory.push(snapshot);
-    if (person.poseHistory.length > TRAIL_LENGTH) {
-      person.poseHistory.shift();
-    }
-  }
 }
 
 function isGoodPoint(point) {
@@ -462,17 +470,6 @@ function drawScrapbookBody(person, id) {
   // circle(nose.x, nose.y, headSize);
 
   let images = characterImageSets[person.characterIndex] || characterImageSets[0];
-
-  // --- Delayed color trail ---
-  if (!useShapeMode && person.poseHistory.length > 0) {
-    for (let t = 0; t < person.poseHistory.length; t++) {
-      let progress = t / (person.poseHistory.length - 1 || 1); // 0 = oldest, 1 = newest
-      let alpha = lerp(0, 55, pow(progress, 2.5));
-      let hueShift = lerp(200, 80, progress); // older = complementary hue, newer = closer to accent
-      let tintHue = (person.accent + hueShift) % 360;
-      drawBodyAtSnapshot(person, person.poseHistory[t], alpha, tintHue);
-    }
-  }
 
   // Render body parts (either images or shapes based on mode)
   if (useShapeMode) {
@@ -679,105 +676,92 @@ function drawBodyShape(img, a, b, partName, personId, scale = 1, offsetY = 0) {
    COLOR TRAIL
 ========================= */
 
-function drawBodyAtSnapshot(person, pts, alpha, tintHue) {
-  let nose          = pts["nose"];
-  let leftShoulder  = pts["left_shoulder"];
-  let rightShoulder = pts["right_shoulder"];
-  let leftElbow     = pts["left_elbow"];
-  let rightElbow    = pts["right_elbow"];
-  let leftWrist     = pts["left_wrist"];
-  let rightWrist    = pts["right_wrist"];
-  let leftHip       = pts["left_hip"];
-  let rightHip      = pts["right_hip"];
-  let leftKnee      = pts["left_knee"];
-  let rightKnee     = pts["right_knee"];
-  let leftAnkle     = pts["left_ankle"];
-  let rightAnkle    = pts["right_ankle"];
+// Draws the current body silhouette into trailBuffer.
+// The buffer is faded each frame in draw(), producing a smooth opacity streak.
+function drawPersonToTrailBuffer(person) {
+  let pts = person.smoothPoints;
 
-  if (!nose || !leftShoulder || !rightShoulder ||
-      !leftHip || !rightHip || !leftElbow || !rightElbow ||
-      !leftWrist || !rightWrist || !leftKnee || !rightKnee ||
-      !leftAnkle || !rightAnkle) return;
+  let nose = pts["nose"];
+  let ls = pts["left_shoulder"],  rs = pts["right_shoulder"];
+  let le = pts["left_elbow"],     re = pts["right_elbow"];
+  let lw = pts["left_wrist"],     rw = pts["right_wrist"];
+  let lh = pts["left_hip"],       rh = pts["right_hip"];
+  let lk = pts["left_knee"],      rk = pts["right_knee"];
+  let la = pts["left_ankle"],     ra = pts["right_ankle"];
 
-  let shoulderCenter = midpoint(leftShoulder, rightShoulder);
-  let hipCenter      = midpoint(leftHip, rightHip);
+  if (!nose || !ls || !rs || !lh || !rh || !le || !re ||
+      !lw || !rw || !lk || !rk || !la || !ra) return;
 
-  colorMode(HSL);
-  noStroke();
+  let sMid = { x: (ls.x + rs.x) / 2, y: (ls.y + rs.y) / 2 };
+  let hMid = { x: (lh.x + rh.x) / 2, y: (lh.y + rh.y) / 2 };
 
-  // Iridescent hue: base shifts over time, each body section offset by ~30°
   let shimmer = (frameCount * 1.2) % 360;
-  let base    = (tintHue + shimmer) % 360;
+  let base    = (person.accent + shimmer) % 360;
+  let a       = 0.55; // HSL alpha (0–1)
 
-  // Arms — taper from shoulder to wrist
-  fill((base)       % 360, 60, 55, alpha); drawTaperedLimb(leftShoulder,  leftElbow,  0.40, 0.30);
-  fill((base + 15)  % 360, 60, 55, alpha); drawTaperedLimb(leftElbow,     leftWrist,  0.30, 0.18);
-  fill((base + 30)  % 360, 60, 55, alpha); drawTaperedLimb(rightShoulder, rightElbow, 0.40, 0.30);
-  fill((base + 45)  % 360, 60, 55, alpha); drawTaperedLimb(rightElbow,    rightWrist, 0.30, 0.18);
+  // Draw a tapered capsule onto trailBuffer
+  function bufLimb(ptA, ptB, rA, rB) {
+    let len   = dist(ptA.x, ptA.y, ptB.x, ptB.y);
+    let angle = atan2(ptB.y - ptA.y, ptB.x - ptA.x);
+    let px    = cos(angle + HALF_PI);
+    let py    = sin(angle + HALF_PI);
+    let hwA   = (len * rA) / 2;
+    let hwB   = (len * rB) / 2;
+    trailBuffer.noStroke();
+    trailBuffer.beginShape();
+    trailBuffer.vertex(ptA.x + px * hwA, ptA.y + py * hwA);
+    trailBuffer.vertex(ptB.x + px * hwB, ptB.y + py * hwB);
+    trailBuffer.vertex(ptB.x - px * hwB, ptB.y - py * hwB);
+    trailBuffer.vertex(ptA.x - px * hwA, ptA.y - py * hwA);
+    trailBuffer.endShape(CLOSE);
+    trailBuffer.ellipseMode(CENTER);
+    trailBuffer.ellipse(ptA.x, ptA.y, len * rA, len * rA);
+    trailBuffer.ellipse(ptB.x, ptB.y, len * rB, len * rB);
+  }
 
-  // Legs — taper from hip to ankle
-  fill((base + 60)  % 360, 60, 55, alpha); drawTaperedLimb(leftHip,   leftKnee,   0.48, 0.36);
-  fill((base + 75)  % 360, 60, 55, alpha); drawTaperedLimb(leftKnee,  leftAnkle,  0.36, 0.22);
-  fill((base + 90)  % 360, 60, 55, alpha); drawTaperedLimb(rightHip,  rightKnee,  0.48, 0.36);
-  fill((base + 105) % 360, 60, 55, alpha); drawTaperedLimb(rightKnee, rightAnkle, 0.36, 0.22);
+  trailBuffer.push();
+  trailBuffer.colorMode(HSL);
+  trailBuffer.noStroke();
 
-  // Torso
-  fill((base + 120) % 360, 60, 55, alpha);
-  drawTorsoSilhouette(leftShoulder, rightShoulder, leftHip, rightHip);
+  // Arms
+  trailBuffer.fill((base)       % 360, 60, 55, a); bufLimb(ls, le, 0.40, 0.30);
+  trailBuffer.fill((base + 15)  % 360, 60, 55, a); bufLimb(le, lw, 0.30, 0.18);
+  trailBuffer.fill((base + 30)  % 360, 60, 55, a); bufLimb(rs, re, 0.40, 0.30);
+  trailBuffer.fill((base + 45)  % 360, 60, 55, a); bufLimb(re, rw, 0.30, 0.18);
+
+  // Legs
+  trailBuffer.fill((base + 60)  % 360, 60, 55, a); bufLimb(lh, lk, 0.48, 0.36);
+  trailBuffer.fill((base + 75)  % 360, 60, 55, a); bufLimb(lk, la, 0.36, 0.22);
+  trailBuffer.fill((base + 90)  % 360, 60, 55, a); bufLimb(rh, rk, 0.48, 0.36);
+  trailBuffer.fill((base + 105) % 360, 60, 55, a); bufLimb(rk, ra, 0.36, 0.22);
+
+  // Torso trapezoid
+  trailBuffer.fill((base + 120) % 360, 60, 55, a);
+  {
+    let sHW   = dist(ls.x, ls.y, rs.x, rs.y) * 0.46;
+    let hHW   = dist(lh.x, lh.y, rh.x, rh.y) * 0.46;
+    let angle = atan2(hMid.y - sMid.y, hMid.x - sMid.x);
+    let px    = cos(angle + HALF_PI);
+    let py    = sin(angle + HALF_PI);
+    trailBuffer.noStroke();
+    trailBuffer.beginShape();
+    trailBuffer.vertex(sMid.x + px * sHW, sMid.y + py * sHW);
+    trailBuffer.vertex(hMid.x + px * hHW, hMid.y + py * hHW);
+    trailBuffer.vertex(hMid.x - px * hHW, hMid.y - py * hHW);
+    trailBuffer.vertex(sMid.x - px * sHW, sMid.y - py * sHW);
+    trailBuffer.endShape(CLOSE);
+  }
 
   // Head
-  fill((base + 150) % 360, 60, 55, alpha);
-  let headLen = dist(nose.x, nose.y, shoulderCenter.x, shoulderCenter.y);
-  let headCY = nose.y - headLen * 0.15;
-  ellipseMode(CENTER);
-  ellipse(nose.x, headCY, headLen * 0.82, headLen * 0.92);
+  trailBuffer.fill((base + 150) % 360, 60, 55, a);
+  let headLen = dist(nose.x, nose.y, sMid.x, sMid.y);
+  let headCY  = nose.y - headLen * 0.15;
+  trailBuffer.ellipseMode(CENTER);
+  trailBuffer.ellipse(nose.x, headCY, headLen * 0.82, headLen * 0.92);
 
-  colorMode(RGB);
+  trailBuffer.pop();
 }
 
-// Tapered capsule: wide at joint a, narrow at joint b
-function drawTaperedLimb(a, b, ratioA, ratioB) {
-  let len   = dist(a.x, a.y, b.x, b.y);
-  let angle = atan2(b.y - a.y, b.x - a.x);
-  let px    = cos(angle + HALF_PI);
-  let py    = sin(angle + HALF_PI);
-
-  let hwA = (len * ratioA) / 2;
-  let hwB = (len * ratioB) / 2;
-
-  noStroke();
-  beginShape();
-  vertex(a.x + px * hwA, a.y + py * hwA);
-  vertex(b.x + px * hwB, b.y + py * hwB);
-  vertex(b.x - px * hwB, b.y - py * hwB);
-  vertex(a.x - px * hwA, a.y - py * hwA);
-  endShape(CLOSE);
-
-  // Rounded caps
-  ellipseMode(CENTER);
-  ellipse(a.x, a.y, len * ratioA, len * ratioA);
-  ellipse(b.x, b.y, len * ratioB, len * ratioB);
-}
-
-// Torso as a trapezoid following actual shoulder/hip keypoints
-function drawTorsoSilhouette(ls, rs, lh, rh) {
-  let sHW = dist(ls.x, ls.y, rs.x, rs.y) * 0.46;
-  let hHW = dist(lh.x, lh.y, rh.x, rh.y) * 0.46;
-
-  let sMid  = midpoint(ls, rs);
-  let hMid  = midpoint(lh, rh);
-  let angle = atan2(hMid.y - sMid.y, hMid.x - sMid.x);
-  let px    = cos(angle + HALF_PI);
-  let py    = sin(angle + HALF_PI);
-
-  noStroke();
-  beginShape();
-  vertex(sMid.x + px * sHW, sMid.y + py * sHW);
-  vertex(hMid.x + px * hHW, hMid.y + py * hHW);
-  vertex(hMid.x - px * hHW, hMid.y - py * hHW);
-  vertex(sMid.x - px * sHW, sMid.y - py * sHW);
-  endShape(CLOSE);
-}
 
 /* =========================
    DIMENSION TRACKING
