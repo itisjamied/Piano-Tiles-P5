@@ -3,7 +3,7 @@ let bodyPose;
 let poses = [];
 
 let videoToggle;
-let showVideo = true;
+let showVideo = false;
 
 // backdrop toggle
 let backdropIframe;
@@ -50,6 +50,15 @@ function mousePressed() {
   console.log("trackedPeople", trackedPeople);
 }
 
+function keyPressed() {
+  if (key === 'h' || key === 'H') {
+    let controls = document.querySelector('.controls');
+    if (controls) {
+      controls.style.display = controls.style.display === 'none' ? 'block' : 'none';
+    }
+  }
+}
+
 function gotPoses(results) {
   poses = results;
 }
@@ -64,7 +73,7 @@ function setup() {
   bodyPose.detectStart(video, gotPoses);
 
   // Video toggle
-  videoToggle = createCheckbox(" Show video", true);
+  videoToggle = createCheckbox(" Show video", false);
   videoToggle.parent("checkboxContainer");
   videoToggle.style("color", "white");
   videoToggle.style("font-size", "18px");
